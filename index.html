@@ -1,144 +1,469 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Downtime Monitor</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-
-<body>
-  <div class="dashboard-container">
-    <div class="header">
-      <div class="icon-placeholder">🔥</div>
-      <div>
-        <h2 id="text-title">Horários Críticos</h2>
-        <p id="text-subtitle">Concentração de falhas (24h)</p>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Downtime Monitor</title>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <div class="logo">
+        <span class="icon">⚡</span>
+        <h2>Downtime Monitor</h2>
       </div>
-      <div class="header-actions">
-        <button id="btn-lang" class="btn-lang">EN</button>
-        <div class="filter">
-          <span id="text-filter">Y GERAL</span>
+      <nav>
+        <button class="nav-btn active" onclick="switchTab('dashboard-tab')">
+          📊 <span id="nav-dash">Dashboard</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('metrics-tab')">
+          📈 <span id="nav-metrics">Metrics</span>
+        </button>
+        <button class="nav-btn" onclick="switchTab('alerts-tab')">
+          🔔 <span id="nav-alerts">Alerts</span>
+        </button>
+        <button class="nav-btn">
+          ⚙️ <span id="nav-settings">Settings</span>
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <button id="btn-lang" class="btn-lang">PT / EN</button>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <div id="dashboard-tab" class="tab-content active">
+        <header class="topbar">
+          <div>
+            <h1 id="text-title">Infrastructure Overview</h1>
+            <p id="text-subtitle">Real-time network telemetry</p>
+          </div>
+          <div class="status-badge" id="global-status-badge">
+            <span class="pulse-dot" id="global-status-dot"></span>
+            <span id="text-status">Operational</span>
+          </div>
+        </header>
+
+        <div class="kpi-grid">
+          <div class="kpi-card">
+            <h3 id="card-uptime">Global Uptime</h3>
+            <div class="kpi-value highlight-green" id="val-uptime">--%</div>
+            <p class="kpi-sub" id="sub-uptime">Recent timeline</p>
+          </div>
+          <div class="kpi-card">
+            <h3 id="card-latency">Avg Latency</h3>
+            <div class="kpi-value highlight-purple" id="val-latency">-- ms</div>
+            <p class="kpi-sub" id="sub-latency">Current ping</p>
+          </div>
+          <div class="kpi-card">
+            <h3 id="card-jitter">Network Jitter</h3>
+            <div class="kpi-value highlight-yellow" id="val-jitter">-- ms</div>
+            <p class="kpi-sub" id="sub-jitter">Variance</p>
+          </div>
+          <div class="kpi-card">
+            <h3 id="card-incidents">Active Incidents</h3>
+            <div class="kpi-value highlight-red" id="val-incidents">0</div>
+            <p class="kpi-sub" id="sub-incidents">Requires attention</p>
+          </div>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-header">
+            <h3 id="chart-title">Latency Timeline</h3>
+            <select class="time-filter">
+              <option>Live Feed</option>
+            </select>
+          </div>
+          <div class="canvas-container">
+            <canvas id="downtimeChart"></canvas>
+          </div>
         </div>
       </div>
-    </div>
 
-    <div class="chart-container">
-      <canvas id="downtimeChart"></canvas>
-    </div>
+      <div id="metrics-tab" class="tab-content">
+        <header class="topbar">
+          <div>
+            <h1 id="text-metrics-title">Raw Telemetry Data</h1>
+            <p id="text-metrics-sub">Live ping logs from the database</p>
+          </div>
+        </header>
+        <div class="chart-card">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th id="th-time">Timestamp</th>
+                <th id="th-target">Target</th>
+                <th id="th-status">Status</th>
+                <th id="th-latency">Latency</th>
+              </tr>
+            </thead>
+            <tbody id="metrics-tbody"></tbody>
+          </table>
+        </div>
+      </div>
 
-    <div class="legend">
-      <span class="dot paused"></span> <span id="text-paused">Pausado</span>
-      <span class="dot offline"></span> <span id="text-offline">Offline</span>
-      <span class="dot error"></span> <span id="text-error">Erro Crítico</span>
-    </div>
-  </div>
+      <div id="alerts-tab" class="tab-content">
+        <header class="topbar">
+          <div>
+            <h1 id="text-alerts-title">System Anomalies</h1>
+            <p id="text-alerts-sub">Recent outages and latency spikes</p>
+          </div>
+        </header>
+        <div id="alerts-container" class="alerts-container"></div>
+      </div>
+    </main>
 
-  <script type="module">
-    import {initializeApp} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import {getFirestore, collection, query, orderBy, limit, getDocs} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    <script type="module">
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        query,
+        orderBy,
+        limit,
+        onSnapshot,
+      } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // --- Translation Logic ---
-    const i18n = {
-      pt: {
-        title: "Horários Críticos", subtitle: "Concentração de falhas (24h)",
-        filter: "Y GERAL", paused: "Pausado", offline: "Offline", error: "Erro Crítico", btn: "EN"
-      },
-      en: {
-        title: "Critical Hours", subtitle: "Failure concentration (24h)",
-        filter: "Y GENERAL", paused: "Paused", offline: "Offline", error: "Critical Error", btn: "PT"
-      }
-    };
+      // --- Translation Logic ---
+      const i18n = {
+        pt: {
+          title: "Visão Geral da Infra",
+          subtitle: "Telemetria de rede em tempo real",
+          dash: "Painel",
+          metrics: "Métricas",
+          alerts: "Alertas",
+          settings: "Configurações",
+          uptime: "Disponibilidade",
+          avgLat: "Latência Média",
+          jitter: "Jitter de Rede",
+          incidents: "Incidentes Ativos",
+          chartTitle: "Linha do Tempo",
+          status: "Operacional",
+          subUp: "Histórico recente",
+          subLat: "Ping atual",
+          subJit: "Variação",
+          subInc: "Requer atenção",
+          metTitle: "Dados Brutos de Telemetria",
+          metSub: "Logs de ping ao vivo do banco de dados",
+          thTime: "Horário",
+          thTarget: "Destino",
+          thStatus: "Status",
+          thLatency: "Latência",
+          altTitle: "Anomalias do Sistema",
+          altSub: "Quedas recentes e picos de latência",
+          agentOffline: "AGENTE OFFLINE",
+          btn: "EN",
+        },
+        en: {
+          title: "Infrastructure Overview",
+          subtitle: "Real-time network telemetry",
+          dash: "Dashboard",
+          metrics: "Metrics",
+          alerts: "Alerts",
+          settings: "Settings",
+          uptime: "Global Uptime",
+          avgLat: "Avg Latency",
+          jitter: "Network Jitter",
+          incidents: "Active Incidents",
+          chartTitle: "Latency Timeline",
+          status: "Operational",
+          subUp: "Recent timeline",
+          subLat: "Current ping",
+          subJit: "Variance",
+          subInc: "Requires attention",
+          metTitle: "Raw Telemetry Data",
+          metSub: "Live ping logs from the database",
+          thTime: "Timestamp",
+          thTarget: "Target",
+          thStatus: "Status",
+          thLatency: "Latency",
+          altTitle: "System Anomalies",
+          altSub: "Recent outages and latency spikes",
+          agentOffline: "AGENT OFFLINE",
+          btn: "PT",
+        },
+      };
 
-    let currentLang = 'pt';
+      let currentLang = "en";
 
-    document.getElementById('btn-lang').addEventListener('click', () => {
-      currentLang = currentLang === 'pt' ? 'en' : 'pt';
-      const t = i18n[currentLang];
+      document.getElementById("btn-lang").addEventListener("click", () => {
+        currentLang = currentLang === "en" ? "pt" : "en";
+        const t = i18n[currentLang];
 
-      document.getElementById('text-title').innerText = t.title;
-      document.getElementById('text-subtitle').innerText = t.subtitle;
-      document.getElementById('text-filter').innerText = t.filter;
-      document.getElementById('text-paused').innerText = t.paused;
-      document.getElementById('text-offline').innerText = t.offline;
-      document.getElementById('text-error').innerText = t.error;
-      document.getElementById('btn-lang').innerText = t.btn;
-    });
+        document.getElementById("nav-dash").innerText = t.dash;
+        document.getElementById("nav-metrics").innerText = t.metrics;
+        document.getElementById("nav-alerts").innerText = t.alerts;
+        document.getElementById("nav-settings").innerText = t.settings;
+        document.getElementById("btn-lang").innerText = t.btn;
 
-    // --- Firebase Logic ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyCO7mbV1gb_c7QOU5X_Cfse-VfXomO6qIk",
-      authDomain: "downtime-monitor-8f10a.firebaseapp.com",
-      projectId: "downtime-monitor-8f10a",
-      storageBucket: "downtime-monitor-8f10a.firebasestorage.app",
-      messagingSenderId: "789651161921",
-      appId: "1:789651161921:web:8a99acb4aaf123cecc97c0"
-    };
+        document.getElementById("text-title").innerText = t.title;
+        document.getElementById("text-subtitle").innerText = t.subtitle;
+        document.getElementById("card-uptime").innerText = t.uptime;
+        document.getElementById("card-latency").innerText = t.avgLat;
+        document.getElementById("card-jitter").innerText = t.jitter;
+        document.getElementById("card-incidents").innerText = t.incidents;
+        document.getElementById("sub-uptime").innerText = t.subUp;
+        document.getElementById("sub-latency").innerText = t.subLat;
+        document.getElementById("sub-jitter").innerText = t.subJit;
+        document.getElementById("sub-incidents").innerText = t.subInc;
+        document.getElementById("chart-title").innerText = t.chartTitle;
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
-
-    async function loadChartData() {
-      const q = query(collection(db, "pings"), orderBy("timestamp", "desc"), limit(50));
-      const querySnapshot = await getDocs(q);
-
-      let labels = [];
-      let dataPoints = [];
-
-      const docs = querySnapshot.docs.reverse();
-
-      docs.forEach((doc) => {
-        const data = doc.data();
-        const date = new Date(data.timestamp);
-        labels.push(`${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`);
-
-        if (data.status === 'DOWN') {
-          dataPoints.push(1000); // Spike for downtime
+        const statusEl = document.getElementById("text-status");
+        if (
+          statusEl.innerText !== "AGENT OFFLINE" &&
+          statusEl.innerText !== "AGENTE OFFLINE"
+        ) {
+          statusEl.innerText = t.status;
         } else {
-          dataPoints.push(data.latency); // Normal wave for latency
+          statusEl.innerText = t.agentOffline;
         }
+
+        document.getElementById("text-metrics-title").innerText = t.metTitle;
+        document.getElementById("text-metrics-sub").innerText = t.metSub;
+        document.getElementById("th-time").innerText = t.thTime;
+        document.getElementById("th-target").innerText = t.thTarget;
+        document.getElementById("th-status").innerText = t.thStatus;
+        document.getElementById("th-latency").innerText = t.thLatency;
+
+        document.getElementById("text-alerts-title").innerText = t.altTitle;
+        document.getElementById("text-alerts-sub").innerText = t.altSub;
       });
 
-      // Always draw the chart, even if arrays are empty, so the grid lines show up
-      drawChart(labels, dataPoints);
-    }
+      window.switchTab = function (tabId) {
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((tab) => tab.classList.remove("active"));
+        document
+          .querySelectorAll(".nav-btn")
+          .forEach((btn) => btn.classList.remove("active"));
+        document.getElementById(tabId).classList.add("active");
+        event.currentTarget.classList.add("active");
+      };
 
-    function drawChart(labels, data) {
-      const ctx = document.getElementById('downtimeChart').getContext('2d');
-      let gradient = ctx.createLinearGradient(0, 0, 0, 300);
-      gradient.addColorStop(0, 'rgba(123, 44, 191, 0.6)');
-      gradient.addColorStop(1, 'rgba(123, 44, 191, 0)');
+      const firebaseConfig = {
+        apiKey: "AIzaSyCO7mbV1gb_c7QOU5X_Cfse-VfXomO6qIk",
+        authDomain: "downtime-monitor-8f10a.firebaseapp.com",
+        projectId: "downtime-monitor-8f10a",
+        storageBucket: "downtime-monitor-8f10a.firebasestorage.app",
+        messagingSenderId: "789651161921",
+        appId: "1:789651161921:web:8a99acb4aaf123cecc97c0",
+      };
 
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [{
-            label: 'Latency (ms)',
-            data: data,
-            borderColor: '#9d4edd',
-            backgroundColor: gradient,
-            borderWidth: 2,
-            pointRadius: 0,
-            fill: true,
-            tension: 0.4
-          }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false,
-          plugins: {legend: {display: false}},
-          scales: {
-            x: {grid: {display: false}, ticks: {color: '#a6adc8'}},
-            y: {grid: {color: '#313244'}, ticks: {color: '#a6adc8'}, beginAtZero: true}
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      let myChart = null;
+      let lastPingTimestamp = Date.now();
+
+      const q = query(
+        collection(db, "pings"),
+        orderBy("timestamp", "desc"),
+        limit(60),
+      );
+
+      onSnapshot(q, (querySnapshot) => {
+        let labels = [];
+        let dataPoints = [];
+        let latenciesOnly = [];
+        let upCount = 0;
+        let downCount = 0;
+
+        const tbody = document.getElementById("metrics-tbody");
+        const alertsBox = document.getElementById("alerts-container");
+        tbody.innerHTML = "";
+        alertsBox.innerHTML = "";
+
+        const docs = querySnapshot.docs.reverse();
+
+        if (docs.length > 0) {
+          lastPingTimestamp = new Date(
+            docs[docs.length - 1].data().timestamp,
+          ).getTime();
+          document.getElementById("text-status").innerText =
+            currentLang === "en" ? "Operational" : "Operacional";
+          document.getElementById("global-status-badge").style.backgroundColor =
+            "rgba(166, 227, 161, 0.1)";
+          document.getElementById("global-status-badge").style.color =
+            "#a6e3a1";
+          document.getElementById("global-status-dot").style.backgroundColor =
+            "#a6e3a1";
+        }
+
+        [...docs].reverse().forEach((doc) => {
+          const data = doc.data();
+          const date = new Date(data.timestamp);
+          const timeString = `${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}:${date.getSeconds().toString().padStart(2, "0")}`;
+
+          const statusHtml =
+            data.status === "UP"
+              ? `<span class="badge badge-up">UP</span>`
+              : `<span class="badge badge-down">DOWN</span>`;
+
+          // Dynamically display the target IP if it exists, otherwise fallback to Gateway
+          const targetName = data.target || "Gateway";
+
+          tbody.innerHTML += `
+                    <tr>
+                        <td>${timeString}</td>
+                        <td>${targetName}</td>
+                        <td>${statusHtml}</td>
+                        <td>${data.status === "UP" ? data.latency + " ms" : "N/A"}</td>
+                    </tr>
+                `;
+
+          if (data.status === "DOWN") {
+            alertsBox.innerHTML += `
+                        <div class="alert-card critical">
+                            <div class="alert-icon">❌</div>
+                            <div class="alert-info">
+                                <h4>System Outage Detected</h4>
+                                <p>${targetName} failed to respond at ${timeString}</p>
+                            </div>
+                        </div>`;
+          } else if (data.latency > 100) {
+            alertsBox.innerHTML += `
+                        <div class="alert-card warning">
+                            <div class="alert-icon">⚠️</div>
+                            <div class="alert-info">
+                                <h4>Latency Spike Detected</h4>
+                                <p>${targetName} peaked at ${data.latency}ms at ${timeString}</p>
+                            </div>
+                        </div>`;
+          }
+        });
+
+        docs.forEach((doc) => {
+          const data = doc.data();
+          const date = new Date(data.timestamp);
+          labels.push(
+            `${date.getHours()}:${date.getMinutes().toString().padStart(2, "0")}`,
+          );
+
+          if (data.status === "DOWN") {
+            dataPoints.push(1000);
+            downCount++;
+          } else {
+            dataPoints.push(data.latency);
+            latenciesOnly.push(data.latency);
+            upCount++;
+          }
+        });
+
+        const total = docs.length;
+        const uptimePct =
+          total > 0 ? ((upCount / total) * 100).toFixed(2) : 100;
+
+        let avgLat = 0;
+        if (latenciesOnly.length > 0) {
+          const sum = latenciesOnly.reduce((a, b) => a + b, 0);
+          avgLat = Math.round(sum / latenciesOnly.length);
+        }
+
+        let jitter = 0;
+        if (latenciesOnly.length > 1) {
+          let jitterSum = 0;
+          for (let i = 1; i < latenciesOnly.length; i++) {
+            jitterSum += Math.abs(latenciesOnly[i] - latenciesOnly[i - 1]);
+          }
+          jitter = Math.round(jitterSum / (latenciesOnly.length - 1));
+        }
+
+        document.getElementById("val-uptime").innerText = `${uptimePct}%`;
+        document.getElementById("val-latency").innerText = `${avgLat} ms`;
+        document.getElementById("val-jitter").innerText = `${jitter} ms`;
+        document.getElementById("val-incidents").innerText = downCount;
+
+        if (alertsBox.innerHTML === "") {
+          alertsBox.innerHTML = `<p style="color:#a6adc8; padding: 20px;">✅ All systems normal. No recent anomalies detected.</p>`;
+        }
+
+        drawChart(labels, dataPoints);
+      });
+
+      setInterval(() => {
+        const now = Date.now();
+        const timeSinceLastPing = now - lastPingTimestamp;
+
+        if (timeSinceLastPing > 120000) {
+          document.getElementById("text-status").innerText =
+            currentLang === "en" ? "AGENT OFFLINE" : "AGENTE OFFLINE";
+          document.getElementById("global-status-badge").style.backgroundColor =
+            "rgba(243, 139, 168, 0.1)";
+          document.getElementById("global-status-badge").style.color =
+            "#f38ba8";
+          document.getElementById("global-status-dot").style.backgroundColor =
+            "#f38ba8";
+
+          const alertsBox = document.getElementById("alerts-container");
+          if (!alertsBox.innerHTML.includes("Agent Offline")) {
+            alertsBox.innerHTML =
+              `
+                        <div class="alert-card critical">
+                            <div class="alert-icon">🔌</div>
+                            <div class="alert-info">
+                                <h4>Agent Offline / Potential Power Outage</h4>
+                                <p>No telemetry received in over 2 minutes. Check local hardware and power source.</p>
+                            </div>
+                        </div>` + alertsBox.innerHTML;
           }
         }
-      });
-    }
+      }, 10000);
 
-    loadChartData();
-  </script>
-</body>
+      function drawChart(labels, data) {
+        const ctx = document.getElementById("downtimeChart").getContext("2d");
 
+        if (myChart) {
+          myChart.data.labels = labels;
+          myChart.data.datasets[0].data = data;
+          myChart.update();
+          return;
+        }
+
+        let gradient = ctx.createLinearGradient(0, 0, 0, 400);
+        gradient.addColorStop(0, "rgba(123, 44, 191, 0.5)");
+        gradient.addColorStop(1, "rgba(123, 44, 191, 0.05)");
+
+        myChart = new Chart(ctx, {
+          type: "line",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: "Latency (ms)",
+                data: data,
+                borderColor: "#b4befe",
+                backgroundColor: gradient,
+                borderWidth: 2,
+                pointRadius: 2,
+                pointBackgroundColor: "#89b4fa",
+                fill: true,
+                tension: 0.3,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: {
+                grid: { color: "#313244", drawBorder: false },
+                ticks: { color: "#a6adc8", maxTicksLimit: 12 },
+              },
+              y: {
+                grid: { color: "#313244", drawBorder: false },
+                ticks: { color: "#a6adc8" },
+                beginAtZero: true,
+              },
+            },
+          },
+        });
+      }
+    </script>
+  </body>
 </html>
