@@ -1,0 +1,7 @@
+{
+  "name": "downtime-monitor",
+  "type": "module",
+  "dependencies": {
+    "firebase": "^10.14.1"
+  }
+}

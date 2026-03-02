@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Downtime Monitor</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<body>
+  <div class="dashboard-container">
+    <div class="header">
+      <div class="icon-placeholder">🔥</div>
+      <div>
+        <h2 id="text-title">Horários Críticos</h2>
+        <p id="text-subtitle">Concentração de falhas (24h)</p>
+      </div>
+      <div class="header-actions">
+        <button id="btn-lang" class="btn-lang">EN</button>
+        <div class="filter">
+          <span id="text-filter">Y GERAL</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <canvas id="downtimeChart"></canvas>
+    </div>
+
+    <div class="legend">
+      <span class="dot paused"></span> <span id="text-paused">Pausado</span>
+      <span class="dot offline"></span> <span id="text-offline">Offline</span>
+      <span class="dot error"></span> <span id="text-error">Erro Crítico</span>
+    </div>
+  </div>
+
+  <script type="module">
+    import {initializeApp} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+    import {getFirestore, collection, query, orderBy, limit, getDocs} from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    // --- Translation Logic ---
+    const i18n = {
+      pt: {
+        title: "Horários Críticos", subtitle: "Concentração de falhas (24h)",
+        filter: "Y GERAL", paused: "Pausado", offline: "Offline", error: "Erro Crítico", btn: "EN"
+      },
+      en: {
+        title: "Critical Hours", subtitle: "Failure concentration (24h)",
+        filter: "Y GENERAL", paused: "Paused", offline: "Offline", error: "Critical Error", btn: "PT"
+      }
+    };
+
+    let currentLang = 'pt';
+
+    document.getElementById('btn-lang').addEventListener('click', () => {
+      currentLang = currentLang === 'pt' ? 'en' : 'pt';
+      const t = i18n[currentLang];
+
+      document.getElementById('text-title').innerText = t.title;
+      document.getElementById('text-subtitle').innerText = t.subtitle;
+      document.getElementById('text-filter').innerText = t.filter;
+      document.getElementById('text-paused').innerText = t.paused;
+      document.getElementById('text-offline').innerText = t.offline;
+      document.getElementById('text-error').innerText = t.error;
+      document.getElementById('btn-lang').innerText = t.btn;
+    });
+
+    // --- Firebase Logic ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyCO7mbV1gb_c7QOU5X_Cfse-VfXomO6qIk",
+      authDomain: "downtime-monitor-8f10a.firebaseapp.com",
+      projectId: "downtime-monitor-8f10a",
+      storageBucket: "downtime-monitor-8f10a.firebasestorage.app",
+      messagingSenderId: "789651161921",
+      appId: "1:789651161921:web:8a99acb4aaf123cecc97c0"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    async function loadChartData() {
+      const q = query(collection(db, "pings"), orderBy("timestamp", "desc"), limit(50));
+      const querySnapshot = await getDocs(q);
+
+      let labels = [];
+      let dataPoints = [];
+
+      const docs = querySnapshot.docs.reverse();
+
+      docs.forEach((doc) => {
+        const data = doc.data();
+        const date = new Date(data.timestamp);
+        labels.push(`${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}`);
+
+        if (data.status === 'DOWN') {
+          dataPoints.push(1000); // Spike for downtime
+        } else {
+          dataPoints.push(data.latency); // Normal wave for latency
+        }
+      });
+
+      // Always draw the chart, even if arrays are empty, so the grid lines show up
+      drawChart(labels, dataPoints);
+    }
+
+    function drawChart(labels, data) {
+      const ctx = document.getElementById('downtimeChart').getContext('2d');
+      let gradient = ctx.createLinearGradient(0, 0, 0, 300);
+      gradient.addColorStop(0, 'rgba(123, 44, 191, 0.6)');
+      gradient.addColorStop(1, 'rgba(123, 44, 191, 0)');
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Latency (ms)',
+            data: data,
+            borderColor: '#9d4edd',
+            backgroundColor: gradient,
+            borderWidth: 2,
+            pointRadius: 0,
+            fill: true,
+            tension: 0.4
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {legend: {display: false}},
+          scales: {
+            x: {grid: {display: false}, ticks: {color: '#a6adc8'}},
+            y: {grid: {color: '#313244'}, ticks: {color: '#a6adc8'}, beginAtZero: true}
+          }
+        }
+      });
+    }
+
+    loadChartData();
+  </script>
+</body>
+
+</html>
